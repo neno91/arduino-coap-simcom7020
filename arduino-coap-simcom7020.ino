@@ -1,6 +1,23 @@
 #include <Arduino.h>
 #include "coap.h"
 #include "arduino_secrets.h"
+#include <Ethernet.h>
+#include <EthernetUdp.h>
+
+char     pinnumber[]     = SECRET_PINNUMBER;
+char     gprs_apn[]      = SECRET_GPRS_APN;
+uint32_t coap_ip         = SECRET_COAP_IP;
+char     coap_endpoint[] = SECRET_COAP_ENDPOINT;
+uint32_t coap_port       = SECRET_COAP_PORT;
+uint32_t rat             = SECRET_RAT;
+uint32_t cops            = SECRET_COPS;
+bool     debug           = true;
+
+
+EthernetUDP     Udp;
+Coap      coap(Udp);
+
+IPAddress iotgw_ip(coap_ip);
 
 void setup() {
   Serial.begin(115200);
@@ -25,13 +42,34 @@ void setup() {
   modem_command("AT+CGREG?", 1000);
   modem_command("AT+CGCONTRDP", 10000);
   Serial.println("-- Setup complete --");
+  coap.start();
 }
 
 
 void loop() {
-  delay(10000);
+  while (Serial.available() == 0);
+  while (Serial.available() > 0) {
+    Serial1.write(Serial.read());
+  }
+  while (Serial1.available() > 0){
+    Serial.write(Serial1.read());
+  }
 }
 
+
+void modem_command(String command, int commandtimout){
+  Serial1.println(command);
+  while (Serial1.available() == 0);
+  unsigned long lastRead = millis();
+  while (millis() - lastRead < commandtimout){   
+    while (Serial1.available() > 0){
+      Serial.write(Serial1.read());
+      lastRead = millis();
+    }
+  }
+}
+
+//function from telenor git coap repo.
 uint16_t sendPacket () {
   // Generate random simulated data
   float tmp = 20 + random(0, 9);
@@ -58,19 +96,6 @@ uint16_t sendPacket () {
     (uint8_t *) buffer, // Message payload
     buf_size            // Message payload length
   );
-
+  Serial.write(msgid);
   return msgid;
-}
-
-
-void modem_command(String command, int commandtimout){
-  Serial1.println(command);
-  while (Serial1.available() == 0);
-  unsigned long lastRead = millis();
-  while (millis() - lastRead < commandtimout){   
-    while (Serial1.available() > 0){
-      Serial.write(Serial1.read());
-      lastRead = millis();
-    }
-  }
 }
